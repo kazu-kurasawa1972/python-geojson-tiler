@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "python-geojson-tiler"
+version = "0.1.0"
+description = "Beginner-friendly Python tool for chunking large GeoJSON datasets into XYZ tiles."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+  { name = "SpatialWorkflowIo" },
+]
+keywords = ["geojson", "xyz", "tiles", "gis", "spatial", "web maps"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: GIS",
+]
+
+[project.urls]
+Homepage = "https://spatialworkflow.io/"
+Documentation = "https://spatialworkflow.io/"
+Source = "https://github.com/SpatialWorkflowIo/python-geojson-tiler"
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+]
+
+[project.scripts]
+geojson-tiler = "geojson_tiler.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "--cov=geojson_tiler --cov-report=term-missing --cov-fail-under=100"
+testpaths = ["tests"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+

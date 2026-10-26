@@ -171,6 +171,33 @@ Each tile file is a valid GeoJSON `FeatureCollection`.
 - total tile count written
 - a list of tile addresses and relative file paths
 
+## Reducing tile size with property filters
+
+Because features are duplicated into every tile they touch, big properties are repeated many times. Remove the ones your map does not need:
+
+```bash
+cat > props.geojson <<'EOF'
+{"type": "Feature", "properties": {"name": "a", "pop": 5, "secret": "x"}, "geometry": {"type": "Point", "coordinates": [13.405, 52.52]}}
+EOF
+geojson-tiler props.geojson props-tiles --keep-properties name,pop
+geojson-tiler props.geojson props-tiles-2 --drop-properties secret
+```
+
+Without a filter, `props-tiles/0/0/0.geojson` contains all three properties. With either command above it contains only:
+
+```json
+"properties": {"name": "a", "pop": 5}
+```
+
+- `--keep-properties NAMES` keeps only the listed properties.
+- `--drop-properties NAMES` removes the listed properties and keeps the rest.
+- Names are comma-separated; spaces around names are ignored and empty names (such as `a,,b`) are an error.
+- Names that a feature does not have are ignored.
+- The two options cannot be combined (exit code 2). By default all properties are kept.
+- Geometry, `id` and other feature members are never changed.
+
+In Python: `tile_geojson(data, keep_properties=["name", "pop"])` or `drop_properties=["secret"]`.
+
 ## Python API
 
 You can also use the tiler directly from Python:
@@ -278,6 +305,7 @@ src/geojson_tiler/
 ├── __init__.py
 ├── __main__.py
 ├── cli.py
+├── filters.py
 ├── geojson.py
 ├── tiler.py
 ├── writer.py

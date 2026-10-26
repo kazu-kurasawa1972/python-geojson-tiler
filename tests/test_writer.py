@@ -90,15 +90,17 @@ def test_write_tiles_metadata_full_content_for_two_zooms(tmp_path):
 
     returned = write_tiles(_two_zoom_result(), output_dir, source_name="in.geojson")
 
+    sizes = [(output_dir / p).stat().st_size for p in ("0/0/0.geojson", "1/0/1.geojson", "1/1/1.geojson")]
     expected = {
         "source": "in.geojson",
         "feature_count": 1,
         "tile_count": 3,
         "tiles": [
-            {"z": 0, "x": 0, "y": 0, "path": "0/0/0.geojson"},
-            {"z": 1, "x": 0, "y": 1, "path": "1/0/1.geojson"},
-            {"z": 1, "x": 1, "y": 1, "path": "1/1/1.geojson"},
+            {"z": 0, "x": 0, "y": 0, "path": "0/0/0.geojson", "feature_count": 1, "bytes": sizes[0]},
+            {"z": 1, "x": 0, "y": 1, "path": "1/0/1.geojson", "feature_count": 1, "bytes": sizes[1]},
+            {"z": 1, "x": 1, "y": 1, "path": "1/1/1.geojson", "feature_count": 1, "bytes": sizes[2]},
         ],
+        "total_bytes": sum(sizes),
     }
     assert returned == expected
     assert json.loads((output_dir / "metadata.json").read_text(encoding="utf-8")) == expected

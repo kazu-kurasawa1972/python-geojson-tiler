@@ -13,6 +13,18 @@ def tile_path(output_dir: str | Path, tile: TileAddress) -> Path:
     return Path(output_dir) / str(tile.z) / str(tile.x) / f"{tile.y}.geojson"
 
 
+def _write_tile(
+    output_path: Path, tile: TileAddress, payload: dict[str, Any], indent: int | None
+) -> int:
+    """Write one tile file and return its size in bytes."""
+    destination = tile_path(output_path, tile)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(payload, indent=indent, sort_keys=True) + ("\n" if indent is not None else "")
+    data = text.encode("utf-8")
+    destination.write_bytes(data)
+    return len(data)
+
+
 def write_tiles(
     result: TileBuildResult,
     output_dir: str | Path,
@@ -31,14 +43,10 @@ def write_tiles(
 
     output_path.mkdir(parents=True, exist_ok=True)
 
-    for tile, payload in result.tiles.items():
-        destination = tile_path(output_path, tile)
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_text(
-            json.dumps(payload, indent=indent, sort_keys=True)
-            + ("\n" if indent is not None else ""),
-            encoding="utf-8",
-        )
+    tile_bytes = {
+        tile: _write_tile(output_path, tile, payload, indent)
+        for tile, payload in result.tiles.items()
+    }
 
     metadata = {
         "source": source_name,
@@ -50,9 +58,12 @@ def write_tiles(
                 "x": tile.x,
                 "y": tile.y,
                 "path": f"{tile.z}/{tile.x}/{tile.y}.geojson",
+                "feature_count": len(result.tiles[tile]["features"]),
+                "bytes": tile_bytes[tile],
             }
             for tile in sorted(result.tiles.keys())
         ],
+        "total_bytes": sum(tile_bytes.values()),
     }
     (output_path / "metadata.json").write_text(
         json.dumps(metadata, indent=indent, sort_keys=True)

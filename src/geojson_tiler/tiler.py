@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Iterable
 
+from .filters import filter_feature
 from .geojson import feature_bounds, normalize_geojson
 from .xyz import TileAddress, count_tiles_for_bounds, tiles_for_bounds, validate_zoom
 
@@ -38,14 +39,20 @@ def tile_geojson(
     min_zoom: int = 0,
     max_zoom: int = 0,
     max_tiles: int = DEFAULT_MAX_TILES,
+    keep_properties: Iterable[str] | None = None,
+    drop_properties: Iterable[str] | None = None,
 ) -> TileBuildResult:
     """Split a GeoJSON object into tile-sized FeatureCollections.
 
     Raises TileLimitError as soon as more than ``max_tiles`` tiles would be needed.
+    ``keep_properties`` / ``drop_properties`` (not both) filter feature properties.
     """
     validate_zoom_range(min_zoom, max_zoom)
     if isinstance(max_tiles, bool) or not isinstance(max_tiles, int) or max_tiles < 1:
         raise ValueError("max_tiles must be a positive integer.")
+    if keep_properties is not None and drop_properties is not None:
+        raise ValueError("Use either keep_properties or drop_properties, not both.")
+    filtering = keep_properties is not None or drop_properties is not None
     collection = normalize_geojson(data)
 
     buckets: dict[TileAddress, list[dict[str, Any]]] = defaultdict(list)
@@ -56,6 +63,8 @@ def tile_geojson(
         bounds = feature_bounds(feature)
         if bounds is None:
             continue
+        if filtering:
+            feature = filter_feature(feature, keep=keep_properties, drop=drop_properties)
 
         for zoom in range(min_zoom, max_zoom + 1):
             # Check the size arithmetically so a huge feature never builds a huge list.

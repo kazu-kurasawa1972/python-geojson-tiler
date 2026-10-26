@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from . import __version__
+from .filters import parse_property_names
 from .geojson import load_geojson
 from .tiler import DEFAULT_MAX_TILES, tile_geojson, validate_zoom_range
 from .writer import write_tiles
@@ -56,6 +57,13 @@ def largest_tile_line(tiles: list[dict[str, Any]]) -> str | None:
     return f"Largest tile: {_tile_name(biggest)} ({biggest['bytes']} bytes)"
 
 
+def _property_names(text: str) -> list[str]:
+    try:
+        return parse_property_names(text)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from None
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser."""
     parser = argparse.ArgumentParser(
@@ -85,6 +93,19 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_MAX_TILES,
         help="Stop with an error if more than this many tiles would be created "
         "(default: %(default)s).",
+    )
+    filters = parser.add_mutually_exclusive_group()
+    filters.add_argument(
+        "--keep-properties",
+        type=_property_names,
+        metavar="NAMES",
+        help="Comma-separated property names to keep; all others are removed.",
+    )
+    filters.add_argument(
+        "--drop-properties",
+        type=_property_names,
+        metavar="NAMES",
+        help="Comma-separated property names to remove; all others are kept.",
     )
     parser.add_argument(
         "--indent",
@@ -130,6 +151,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             min_zoom=args.min_zoom,
             max_zoom=args.max_zoom,
             max_tiles=args.max_tiles,
+            keep_properties=args.keep_properties,
+            drop_properties=args.drop_properties,
         )
         metadata = write_tiles(
             result,

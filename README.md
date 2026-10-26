@@ -90,7 +90,7 @@ Your files will then be available at paths like:
 ## Command-line usage
 
 ```bash
-geojson-tiler INPUT OUTPUT [--min-zoom MIN] [--max-zoom MAX] [--max-tiles N] [--indent N] [--overwrite] [--quiet]
+geojson-tiler INPUT OUTPUT [--min-zoom MIN] [--max-zoom MAX] [--max-tiles N] [--keep-properties NAMES | --drop-properties NAMES] [--indent N] [--warn-tile-bytes N] [--overwrite] [--quiet]
 ```
 
 ### Arguments
@@ -100,7 +100,10 @@ geojson-tiler INPUT OUTPUT [--min-zoom MIN] [--max-zoom MAX] [--max-tiles N] [--
 - `--min-zoom`: first zoom level to generate, default `0`, maximum `22`
 - `--max-zoom`: last zoom level to generate, default `0`, maximum `22`
 - `--max-tiles`: stop with an error if more than this many tiles would be created, default `100000`
+- `--keep-properties`: comma-separated property names to keep; all others are removed (cannot be combined with `--drop-properties`)
+- `--drop-properties`: comma-separated property names to remove; all others are kept
 - `--indent`: JSON indentation level for generated files (`0` or greater), default `2`
+- `--warn-tile-bytes`: print a warning for each written tile larger than this many bytes, default `500000`
 - `--overwrite`: allow writing into a non-empty output directory
 - `--quiet`: skip the success summary message
 - `--version`: print the installed version
@@ -205,6 +208,33 @@ geojson-tiler sample.geojson stats-tiles --max-zoom 2 --overwrite --warn-tile-by
 ```text
 Warning: tile 0/0/0 is 560 bytes (limit 1)
 ```
+
+## Reducing tile size with property filters
+
+Because features are duplicated into every tile they touch, big properties are repeated many times. Remove the ones your map does not need:
+
+```bash
+cat > props.geojson <<'EOF'
+{"type": "Feature", "properties": {"name": "a", "pop": 5, "secret": "x"}, "geometry": {"type": "Point", "coordinates": [13.405, 52.52]}}
+EOF
+geojson-tiler props.geojson props-tiles --keep-properties name,pop
+geojson-tiler props.geojson props-tiles-2 --drop-properties secret
+```
+
+Without a filter, `props-tiles/0/0/0.geojson` contains all three properties. With either command above it contains only:
+
+```json
+"properties": {"name": "a", "pop": 5}
+```
+
+- `--keep-properties NAMES` keeps only the listed properties.
+- `--drop-properties NAMES` removes the listed properties and keeps the rest.
+- Names are comma-separated; spaces around names are ignored and empty names (such as `a,,b`) are an error.
+- Names that a feature does not have are ignored.
+- The two options cannot be combined (exit code 2). By default all properties are kept.
+- Geometry, `id` and other feature members are never changed.
+
+In Python: `tile_geojson(data, keep_properties=["name", "pop"])` or `drop_properties=["secret"]`.
 
 ## Python API
 
@@ -323,6 +353,7 @@ src/geojson_tiler/
 ├── __init__.py
 ├── __main__.py
 ├── cli.py
+├── filters.py
 ├── geojson.py
 ├── tiler.py
 ├── writer.py

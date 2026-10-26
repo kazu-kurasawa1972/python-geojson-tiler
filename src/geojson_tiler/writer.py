@@ -25,7 +25,8 @@ def write_tiles(
     output_path = Path(output_dir)
     if output_path.exists() and any(output_path.iterdir()) and not overwrite:
         raise FileExistsError(
-            f"Output directory {output_path} is not empty. Use overwrite=True to continue."
+            f"Output directory {output_path} is not empty. "
+            "Allow overwriting (--overwrite on the command line, overwrite=True in Python) to continue."
         )
 
     output_path.mkdir(parents=True, exist_ok=True)

@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Sequence
 
 from . import __version__
 from .geojson import load_geojson
 from .tiler import DEFAULT_MAX_TILES, tile_geojson, validate_zoom_range
 from .writer import write_tiles
 from .xyz import MAX_ZOOM
+
+MAX_TILE_WARNINGS = 5
 
 
 def _non_negative_int(text: str) -> int:
@@ -26,6 +29,31 @@ def _positive_int(text: str) -> int:
     if value < 1:
         raise argparse.ArgumentTypeError("must be 1 or greater")
     return value
+
+
+def _tile_name(entry: dict[str, Any]) -> str:
+    """Return the z/x/y name of a metadata tile entry."""
+    return f"{entry['z']}/{entry['x']}/{entry['y']}"
+
+
+def oversized_tile_warnings(tiles: list[dict[str, Any]], limit: int) -> list[str]:
+    """Return warning lines for tiles larger than limit bytes (at most 5 listed)."""
+    big = [entry for entry in tiles if entry["bytes"] > limit]
+    lines = [
+        f"Warning: tile {_tile_name(entry)} is {entry['bytes']} bytes (limit {limit})"
+        for entry in big[:MAX_TILE_WARNINGS]
+    ]
+    if len(big) > MAX_TILE_WARNINGS:
+        lines.append(f"... and {len(big) - MAX_TILE_WARNINGS} more")
+    return lines
+
+
+def largest_tile_line(tiles: list[dict[str, Any]]) -> str | None:
+    """Return the 'Largest tile' summary line, or None when there are no tiles."""
+    if not tiles:
+        return None
+    biggest = max(tiles, key=lambda entry: entry["bytes"])
+    return f"Largest tile: {_tile_name(biggest)} ({biggest['bytes']} bytes)"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -63,6 +91,13 @@ def build_parser() -> argparse.ArgumentParser:
         type=_non_negative_int,
         default=2,
         help="Indent level for generated JSON files. Use 0 for compact but multiline output.",
+    )
+    parser.add_argument(
+        "--warn-tile-bytes",
+        type=_positive_int,
+        default=500000,
+        help="Print a warning for each written tile larger than this many bytes "
+        "(default: %(default)s).",
     )
     parser.add_argument(
         "--overwrite",
@@ -108,11 +143,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     except RecursionError:
         parser.exit(2, "Error: the GeoJSON is nested too deeply.\n")
 
+    for line in oversized_tile_warnings(metadata["tiles"], args.warn_tile_bytes):
+        print(line, file=sys.stderr)
+
     if not args.quiet:
         print(
             f"Wrote {metadata['tile_count']} tile file(s) from {metadata['feature_count']} "
             f"feature(s) to {args.output}"
         )
+        largest = largest_tile_line(metadata["tiles"])
+        if largest is not None:
+            print(largest)
         print(f"Metadata: {Path(args.output) / 'metadata.json'}")
 
     return 0

@@ -92,7 +92,10 @@ def test_main_success_output_has_exact_line_shapes(sample_input, tmp_path, capsy
     captured = capsys.readouterr()
     assert exit_code == 0
     assert captured.err == ""
-    assert captured.out.splitlines() == [
+    lines = captured.out.splitlines()
+    assert lines[1].startswith("Largest tile: ")
+    del lines[1]
+    assert lines == [
         f"Wrote 2 tile file(s) from 1 feature(s) to {output_dir}",
         f"Metadata: {output_dir / 'metadata.json'}",
     ]

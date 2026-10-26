@@ -171,6 +171,41 @@ Each tile file is a valid GeoJSON `FeatureCollection`.
 - total tile count written
 - a list of tile addresses and relative file paths
 
+## Tile statistics
+
+Every run records how big each tile is, so you can spot tiles that are too heavy to serve. Try it:
+
+```bash
+geojson-tiler sample.geojson stats-tiles --max-zoom 2 --overwrite
+cat stats-tiles/metadata.json
+```
+
+Each entry in the `tiles` list of `metadata.json` also has `feature_count` (features in that tile) and `bytes` (size of the written tile file). The top level has `total_bytes`, the sum of all tile sizes:
+
+```json
+{
+  "source": "sample.geojson",
+  "feature_count": 2,
+  "tile_count": 4,
+  "tiles": [
+    {"z": 0, "x": 0, "y": 0, "path": "0/0/0.geojson", "feature_count": 2, "bytes": 560}
+  ],
+  "total_bytes": 1240
+}
+```
+
+After the `Wrote ...` line the CLI prints the biggest tile, for example `Largest tile: 0/0/0 (560 bytes)`.
+
+Use `--warn-tile-bytes N` (default `500000`, must be `1` or greater) to get a warning on stderr for each tile larger than `N` bytes. The exit code stays `0`. At most 5 warnings are listed, followed by `... and K more`:
+
+```bash
+geojson-tiler sample.geojson stats-tiles --max-zoom 2 --overwrite --warn-tile-bytes 1
+```
+
+```text
+Warning: tile 0/0/0 is 560 bytes (limit 1)
+```
+
 ## Python API
 
 You can also use the tiler directly from Python:

@@ -134,13 +134,8 @@ def test_tiles_for_bounds_ending_exactly_on_tile_edge_includes_next_tile():
     assert tiles == [TileAddress(z=1, x=0, y=0), TileAddress(z=1, x=1, y=0)]
 
 
-def test_tiles_for_bounds_antimeridian_crossing_bbox_spans_whole_world():
-    # CURRENT BEHAVIOR (possible bug): a bbox that crosses the antimeridian
-    # (min_lon > max_lon) is treated as reversed bounds and swapped, so it
-    # covers -170..170 (almost the whole world) instead of the two small
-    # slivers at x=0 and x=1 around +-180. Expected: only the tiles near +-180,
-    # which at zoom 1 are still x=0 and x=1, so this case cannot distinguish;
-    # the wrongness shows at higher zoom (see the next test).
+def test_tiles_for_bounds_antimeridian_crossing_bbox_at_zoom_1():
+    # west > east means the bbox crosses +-180, covering x=1 (east of 170) and x=0.
     tiles = tiles_for_bounds((170, -5, -170, 5), 1)
 
     assert tiles == [
@@ -152,9 +147,7 @@ def test_tiles_for_bounds_antimeridian_crossing_bbox_spans_whole_world():
 
 
 def test_tiles_for_bounds_antimeridian_crossing_bbox_at_zoom_3():
-    # CURRENT BEHAVIOR (possible bug): (170,-5,-170,5) is swapped to
-    # (-170,-5,170,5) so every x column 0..7 is returned; a correct
-    # antimeridian split would return only x=0 and x=7.
+    # Only the columns next to +-180 are returned, not the whole world.
     tiles = tiles_for_bounds((170, -5, -170, 5), 3)
 
-    assert sorted({tile.x for tile in tiles}) == list(range(8))
+    assert sorted({tile.x for tile in tiles}) == [0, 7]

@@ -143,14 +143,63 @@ def _iter_positions(coordinates: Any) -> Iterator[Position]:
     raise GeoJSONError("Geometry coordinates must contain numeric positions.")
 
 
+def _iter_chains(geometry: dict[str, Any]) -> Iterator[list[Position]]:
+    """Yield each line or polygon ring as a list of positions (points have none)."""
+    geometry_type = geometry.get("type")
+    if geometry_type == "GeometryCollection":
+        for item in geometry.get("geometries", []):
+            yield from _iter_chains(item)
+    elif geometry_type not in ("Point", "MultiPoint"):
+        yield from _chains_in(geometry["coordinates"])
+
+
+def _chains_in(coordinates: Any) -> Iterator[list[Position]]:
+    chain: list[Position] = []
+    for item in coordinates:
+        if _is_position(item):
+            chain.append((float(item[0]), float(item[1])))
+        else:
+            yield from _chains_in(item)
+    if chain:
+        yield chain
+
+
+def _is_position(value: Any) -> bool:
+    return (
+        isinstance(value, (list, tuple))
+        and len(value) >= 2
+        and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in value[:2])
+    )
+
+
+def crosses_antimeridian(geometry: dict[str, Any] | None) -> bool:
+    """Guess whether a geometry crosses +-180: a line or ring jumps by more than 180 degrees."""
+    if geometry is None:
+        return False
+    for chain in _iter_chains(geometry):
+        for start, end in zip(chain, chain[1:]):
+            if abs(end[0] - start[0]) > 180.0:
+                return True
+    return False
+
+
 def geometry_bounds(geometry: dict[str, Any] | None) -> Bounds | None:
-    """Return (min_lon, min_lat, max_lon, max_lat) for a geometry."""
+    """Return (west, south, east, north) for a geometry.
+
+    If a line or ring crosses the antimeridian (see crosses_antimeridian), west is
+    greater than east: west is the smallest longitude >= 0 and east is the
+    largest longitude < 0.
+    """
     positions = list(iter_geometry_positions(geometry))
     if not positions:
         return None
 
     longitudes = [position[0] for position in positions]
     latitudes = [position[1] for position in positions]
+    if crosses_antimeridian(geometry):
+        west = min(lon for lon in longitudes if lon >= 0)
+        east = max(lon for lon in longitudes if lon < 0)
+        return west, min(latitudes), east, max(latitudes)
     return min(longitudes), min(latitudes), max(longitudes), max(latitudes)
 
 

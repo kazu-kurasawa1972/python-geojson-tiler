@@ -219,6 +219,16 @@ That means:
 
 For many beginner and static-serving workflows, this is a good first step.
 
+### Features that cross the antimeridian
+
+If a line or polygon ring jumps by more than 180 degrees of longitude between two consecutive positions (for example `170` to `-170`), it is treated as crossing the antimeridian (+-180). It is written only to the tile columns next to the west and east edges of the map, not to every column in between. Features that do not jump behave as before. Separate parts (`MultiLineString`, `MultiPoint`) are checked on their own, so points at `170` and `-170` are still treated as spanning the whole range.
+
+```bash
+echo '{"type":"Feature","properties":{},"geometry":{"type":"LineString","coordinates":[[170,0],[-170,0]]}}' > dateline.geojson
+geojson-tiler dateline.geojson tiles --max-zoom 3
+ls tiles/3   # only 0 and 7
+```
+
 ### Coordinates use geographic longitude/latitude
 
 The tool expects standard GeoJSON coordinates in longitude/latitude order (`[lon, lat]`). It clamps latitude to the Web Mercator limit used by XYZ tiles.

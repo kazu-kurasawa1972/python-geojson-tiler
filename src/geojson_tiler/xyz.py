@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from math import asinh, atan, degrees, floor, pi, radians, sinh, tan
 
@@ -68,18 +69,28 @@ def tile_bounds(tile: TileAddress) -> Bounds:
     return west, south, east, north
 
 
-def tile_ranges(bounds: Bounds, zoom: int) -> tuple[range, range]:
-    """Return the (x_range, y_range) of tiles touched by the bounds, without building tiles."""
+def tile_ranges(bounds: Bounds, zoom: int) -> tuple[Sequence[int], range]:
+    """Return the (x_values, y_range) of tiles touched by the bounds, without building tiles.
+
+    Bounds are (west, south, east, north). If west is greater than east the bounds
+    cross the antimeridian, so x covers the columns from west to the right edge of
+    the world plus the columns from the left edge to east.
+    """
     validate_zoom(zoom)
-    min_lon, min_lat, max_lon, max_lat = bounds
-    west = min(min_lon, max_lon)
-    east = max(min_lon, max_lon)
+    west, min_lat, east, max_lat = bounds
     south = min(min_lat, max_lat)
     north = max(min_lat, max_lat)
 
     top_left = lonlat_to_tile(west, north, zoom)
     bottom_right = lonlat_to_tile(east, south, zoom)
-    return range(top_left.x, bottom_right.x + 1), range(top_left.y, bottom_right.y + 1)
+    y_range = range(top_left.y, bottom_right.y + 1)
+    if west <= east:
+        return range(top_left.x, bottom_right.x + 1), y_range
+
+    columns = 2**zoom
+    if top_left.x <= bottom_right.x:
+        return range(columns), y_range
+    return [*range(bottom_right.x + 1), *range(top_left.x, columns)], y_range
 
 
 def count_tiles_for_bounds(bounds: Bounds, zoom: int) -> int:

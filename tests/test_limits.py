@@ -35,7 +35,7 @@ def test_tile_ranges_and_count_do_not_build_tiles():
 
 
 def test_huge_feature_fails_fast_before_building_tiles():
-    with pytest.raises(TileLimitError, match="Lower --max-zoom.*raise --max-tiles"):
+    with pytest.raises(TileLimitError, match="Lower the maximum zoom.*--max-zoom.*raise the tile limit.*--max-tiles"):
         tile_geojson(WORLD_LINE, min_zoom=0, max_zoom=22)
 
 

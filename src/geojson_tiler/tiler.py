@@ -30,7 +30,7 @@ def validate_zoom_range(min_zoom: int, max_zoom: int) -> None:
     validate_zoom(min_zoom)
     validate_zoom(max_zoom)
     if min_zoom > max_zoom:
-        raise ValueError("min_zoom must be less than or equal to max_zoom.")
+        raise ValueError("The minimum zoom (--min-zoom) must be less than or equal to the maximum zoom (--max-zoom).")
 
 
 def tile_geojson(
@@ -90,5 +90,5 @@ def tile_geojson(
 def _too_many_tiles(max_tiles: int) -> TileLimitError:
     return TileLimitError(
         f"This would create more than {max_tiles} tiles. "
-        "Lower --max-zoom (max_zoom) or raise --max-tiles (max_tiles)."
+        "Lower the maximum zoom (--max-zoom) or raise the tile limit (--max-tiles)."
     )

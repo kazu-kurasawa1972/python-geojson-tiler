@@ -115,9 +115,8 @@ def test_point_with_z_coordinate_is_preserved():
 
 
 def test_point_with_empty_coordinates_is_counted_but_produces_no_tile():
-    # CURRENT BEHAVIOR (possible bug): {"type": "Point", "coordinates": []} passes
-    # validation and is silently skipped like a null geometry. Per RFC 7946 a
-    # Point needs a position, so this probably should raise GeoJSONError.
+    # Deliberate: RFC 7946 section 3.1 lets processors treat a geometry with an
+    # empty coordinates array as null, so it is counted but produces no tile.
     geometry = {"type": "Point", "coordinates": []}
 
     result = tile_geojson(_feature(geometry, {}))

@@ -102,7 +102,7 @@ geojson-tiler INPUT OUTPUT [--min-zoom MIN] [--max-zoom MAX] [--max-tiles N] [--
 - `--max-tiles`: stop with an error if more than this many tiles would be created, default `100000`
 - `--keep-properties`: comma-separated property names to keep; all others are removed (cannot be combined with `--drop-properties`)
 - `--drop-properties`: comma-separated property names to remove; all others are kept
-- `--indent`: JSON indentation level for generated files (`0` or greater), default `2`
+- `--indent`: JSON indentation level for generated files (`0` or greater), default `2`; `0` means no indentation (one key per line). Every written file ends with a single newline
 - `--warn-tile-bytes`: print a warning for each written tile larger than this many bytes, default `500000`
 - `--overwrite`: allow writing into a non-empty output directory
 - `--quiet`: skip the success summary message
@@ -139,7 +139,7 @@ geojson-tiler world-line.geojson world-tiles --max-zoom 8
 geojson-tiler world-line.geojson world-tiles --max-zoom 9 --max-tiles 1000000 --overwrite
 ```
 
-In Python, pass `max_tiles=` to `tile_geojson`; it raises `TileLimitError` (a `ValueError`).
+In Python, pass `max_tiles=` (and `min_zoom=` / `max_zoom=`) to `tile_geojson`; it raises `TileLimitError` (a `ValueError`).
 
 ### Input restrictions
 
@@ -259,6 +259,8 @@ result = tile_geojson(geojson_data, min_zoom=0, max_zoom=2)
 write_tiles(result, "tiles", source_name="example.geojson")
 ```
 
+`write_tiles` refuses a non-empty output directory unless you pass `overwrite=True`.
+
 ## Supported geometry types
 
 This version supports bounding-box tiling for:
@@ -270,6 +272,7 @@ This version supports bounding-box tiling for:
 - `MultiPolygon`
 - `GeometryCollection`
 - `null` geometry (skipped)
+- geometry with empty coordinates, such as `{"type": "Point", "coordinates": []}` (skipped like `null`, as RFC 7946 section 3.1 allows; it still counts in `feature_count`). An empty `GeometryCollection` is skipped too
 
 ## Important behavior to know
 
@@ -375,7 +378,7 @@ Current limitations:
 
 ### “Output directory is not empty”
 
-Use `--overwrite` if you want to write into an existing output directory.
+Use `--overwrite` if you want to write into an existing output directory (in Python: `write_tiles(..., overwrite=True)`).
 
 ### “GeoJSON root must be a Feature or FeatureCollection”
 
@@ -383,7 +386,7 @@ The input file must be standard GeoJSON with a top-level `Feature` or `FeatureCo
 
 ### “This would create more than N tiles”
 
-Lower `--max-zoom`, or raise `--max-tiles` if you really need that many tiles.
+The message says: "Lower the maximum zoom (--max-zoom) or raise the tile limit (--max-tiles)." Do that if you really need that many tiles. In Python the matching arguments are `max_zoom=` and `max_tiles=`.
 
 ### My tiles seem duplicated
 

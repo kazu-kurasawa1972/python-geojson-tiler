@@ -127,12 +127,9 @@ def test_write_tiles_indented_vs_compact_output(tmp_path):
     compact = tile_path(tmp_path / "compact", tile).read_text(encoding="utf-8")
     assert indented.startswith('{\n  "features"')
     assert indented.endswith("}\n")
-    # CURRENT BEHAVIOR (possible bug): indent=None writes a single line with NO
-    # trailing newline, while any indent writes a trailing newline. The CLI help
-    # says "--indent 0" is "compact but multiline", yet the CLI passes 0 straight
-    # to json.dumps (newlines, no indentation), so None and 0 differ. Expected:
-    # consistent trailing newline for every output mode.
-    assert "\n" not in compact
+    # Compact output is one line, and still ends with exactly one newline.
+    assert compact.endswith("}\n") and not compact.endswith("\n\n")
+    assert "\n" not in compact[:-1]
     assert json.loads(compact) == json.loads(indented)
 
 

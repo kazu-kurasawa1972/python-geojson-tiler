@@ -71,7 +71,7 @@ def test_main_exits_on_invalid_zoom_range(sample_input, tmp_path, capsys):
 
     captured = capsys.readouterr()
     assert exc_info.value.code == 2
-    assert "min_zoom" in captured.err
+    assert "--min-zoom" in captured.err and "min_zoom" not in captured.err
 
 
 def test_main_supports_version_flag(capsys):

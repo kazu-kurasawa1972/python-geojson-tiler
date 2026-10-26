@@ -108,6 +108,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Comma-separated property names to remove; all others are kept.",
     )
     parser.add_argument(
+        "--clip",
+        action="store_true",
+        help="Cut features at tile edges, so tiles hold only the part of each feature that "
+        "lies inside them. Makes tiles larger-feature safe but is slower.",
+    )
+    parser.add_argument(
         "--indent",
         type=_non_negative_int,
         default=2,
@@ -154,6 +160,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             max_tiles=args.max_tiles,
             keep_properties=args.keep_properties,
             drop_properties=args.drop_properties,
+            clip=args.clip,
         )
         metadata = write_tiles(
             result,

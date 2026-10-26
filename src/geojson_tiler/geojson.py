@@ -27,14 +27,29 @@ def load_geojson(path: str | Path) -> dict[str, Any]:
     """Load a GeoJSON file and normalize it to a FeatureCollection."""
     input_path = Path(path)
     try:
-        data = json.loads(input_path.read_text(encoding="utf-8"))
+        data = json.loads(input_path.read_text(encoding="utf-8"), parse_constant=_reject_constant)
     except json.JSONDecodeError as exc:
         raise GeoJSONError(f"Invalid JSON in {input_path}: {exc.msg}.") from exc
+    except RecursionError as exc:
+        raise GeoJSONError(f"{input_path} is nested too deeply to read.") from exc
     return normalize_geojson(data)
+
+
+def _reject_constant(name: str) -> Any:
+    raise GeoJSONError(
+        f"Input contains {name}, which is not valid JSON. Replace it with a number or null."
+    )
 
 
 def normalize_geojson(data: Any) -> dict[str, Any]:
     """Normalize a GeoJSON Feature or FeatureCollection into a FeatureCollection."""
+    try:
+        return _normalize_geojson(data)
+    except RecursionError as exc:
+        raise GeoJSONError("GeoJSON is nested too deeply.") from exc
+
+
+def _normalize_geojson(data: Any) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise GeoJSONError("GeoJSON root must be an object.")
 

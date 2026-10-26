@@ -5,6 +5,7 @@ from math import asinh, atan, degrees, floor, pi, radians, sinh, tan
 
 WEB_MERCATOR_LAT_LIMIT = 85.05112878
 EPSILON = 1e-12
+MAX_ZOOM = 22
 Bounds = tuple[float, float, float, float]
 
 
@@ -21,6 +22,8 @@ def validate_zoom(zoom: int) -> None:
     """Ensure a zoom level can be used in XYZ math."""
     if not isinstance(zoom, int) or isinstance(zoom, bool) or zoom < 0:
         raise ValueError("Zoom must be a non-negative integer.")
+    if zoom > MAX_ZOOM:
+        raise ValueError(f"Zoom {zoom} is too high. The maximum supported zoom is {MAX_ZOOM}.")
 
 
 def clamp_longitude(longitude: float) -> float:
@@ -65,8 +68,8 @@ def tile_bounds(tile: TileAddress) -> Bounds:
     return west, south, east, north
 
 
-def tiles_for_bounds(bounds: Bounds, zoom: int) -> list[TileAddress]:
-    """Return every tile touched by the given geographic bounds."""
+def tile_ranges(bounds: Bounds, zoom: int) -> tuple[range, range]:
+    """Return the (x_range, y_range) of tiles touched by the bounds, without building tiles."""
     validate_zoom(zoom)
     min_lon, min_lat, max_lon, max_lat = bounds
     west = min(min_lon, max_lon)
@@ -76,10 +79,16 @@ def tiles_for_bounds(bounds: Bounds, zoom: int) -> list[TileAddress]:
 
     top_left = lonlat_to_tile(west, north, zoom)
     bottom_right = lonlat_to_tile(east, south, zoom)
+    return range(top_left.x, bottom_right.x + 1), range(top_left.y, bottom_right.y + 1)
 
-    return [
-        TileAddress(z=zoom, x=x, y=y)
-        for x in range(top_left.x, bottom_right.x + 1)
-        for y in range(top_left.y, bottom_right.y + 1)
-    ]
 
+def count_tiles_for_bounds(bounds: Bounds, zoom: int) -> int:
+    """Return how many tiles the bounds touch, computed from range sizes only."""
+    x_range, y_range = tile_ranges(bounds, zoom)
+    return len(x_range) * len(y_range)
+
+
+def tiles_for_bounds(bounds: Bounds, zoom: int) -> list[TileAddress]:
+    """Return every tile touched by the given geographic bounds."""
+    x_range, y_range = tile_ranges(bounds, zoom)
+    return [TileAddress(z=zoom, x=x, y=y) for x in x_range for y in y_range]

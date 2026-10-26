@@ -90,19 +90,58 @@ Your files will then be available at paths like:
 ## Command-line usage
 
 ```bash
-geojson-tiler INPUT OUTPUT [--min-zoom MIN] [--max-zoom MAX] [--indent N] [--overwrite] [--quiet]
+geojson-tiler INPUT OUTPUT [--min-zoom MIN] [--max-zoom MAX] [--max-tiles N] [--indent N] [--overwrite] [--quiet]
 ```
 
 ### Arguments
 
 - `INPUT`: path to a GeoJSON file containing a `Feature` or `FeatureCollection`
 - `OUTPUT`: directory that will receive XYZ tile folders
-- `--min-zoom`: first zoom level to generate, default `0`
-- `--max-zoom`: last zoom level to generate, default `0`
-- `--indent`: JSON indentation level for generated files, default `2`
+- `--min-zoom`: first zoom level to generate, default `0`, maximum `22`
+- `--max-zoom`: last zoom level to generate, default `0`, maximum `22`
+- `--max-tiles`: stop with an error if more than this many tiles would be created, default `100000`
+- `--indent`: JSON indentation level for generated files (`0` or greater), default `2`
 - `--overwrite`: allow writing into a non-empty output directory
 - `--quiet`: skip the success summary message
 - `--version`: print the installed version
+
+### Default zoom behavior
+
+With no zoom options, `--min-zoom` and `--max-zoom` are both `0`, so the tool writes only the single world tile `0/0/0.geojson`. To get more detailed tiles, raise `--max-zoom`:
+
+```bash
+geojson-tiler sample.geojson tiles --max-zoom 4
+```
+
+### Safety limits
+
+Each zoom level has four times as many tiles as the one before, so a large feature at a high zoom can need an enormous number of tiles. Two guards keep that from running away:
+
+- **Zoom cap:** zoom levels above `22` are rejected.
+- **Tile limit:** `--max-tiles` (default `100000`) stops the run with an error as soon as more tiles than that would be needed. The check happens before the tiles are built, so it fails immediately instead of using up memory.
+
+For example, this fails fast because a world-spanning line needs trillions of tiles at zoom 22:
+
+```bash
+cat > world-line.geojson <<'EOF'
+{"type": "Feature", "properties": {}, "geometry": {"type": "LineString", "coordinates": [[-179, -80], [179, 80]]}}
+EOF
+geojson-tiler world-line.geojson world-tiles --max-zoom 22
+```
+
+Fix it by lowering `--max-zoom`, or raise the limit on purpose:
+
+```bash
+geojson-tiler world-line.geojson world-tiles --max-zoom 8
+geojson-tiler world-line.geojson world-tiles --max-zoom 9 --max-tiles 1000000 --overwrite
+```
+
+In Python, pass `max_tiles=` to `tile_geojson`; it raises `TileLimitError` (a `ValueError`).
+
+### Input restrictions
+
+- `NaN`, `Infinity` and `-Infinity` are not valid JSON and are rejected with an error that names the problem. Replace them with real numbers or `null`.
+- Extremely deeply nested input is rejected with a clean `Error:` message (exit code 2) instead of a traceback.
 
 ## Output layout
 
@@ -255,7 +294,6 @@ Current limitations:
 - no simplification by zoom level
 - no spatial index yet
 - no direct shapefile reader yet
-- no hosted GitHub automation yet in this workspace
 
 ## Troubleshooting
 
@@ -266,6 +304,10 @@ Use `--overwrite` if you want to write into an existing output directory.
 ### “GeoJSON root must be a Feature or FeatureCollection”
 
 The input file must be standard GeoJSON with a top-level `Feature` or `FeatureCollection` object.
+
+### “This would create more than N tiles”
+
+Lower `--max-zoom`, or raise `--max-tiles` if you really need that many tiles.
 
 ### My tiles seem duplicated
 

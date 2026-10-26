@@ -19,7 +19,7 @@ def _write_tile(
     """Write one tile file and return its size in bytes."""
     destination = tile_path(output_path, tile)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    text = json.dumps(payload, indent=indent, sort_keys=True) + ("\n" if indent is not None else "")
+    text = json.dumps(payload, indent=indent, sort_keys=True) + "\n"  # always one trailing newline
     data = text.encode("utf-8")
     destination.write_bytes(data)
     return len(data)
@@ -38,7 +38,7 @@ def write_tiles(
     if output_path.exists() and any(output_path.iterdir()) and not overwrite:
         raise FileExistsError(
             f"Output directory {output_path} is not empty. "
-            "Allow overwriting (--overwrite on the command line, overwrite=True in Python) to continue."
+            "Allow overwriting (--overwrite) to write into it anyway."
         )
 
     output_path.mkdir(parents=True, exist_ok=True)
@@ -66,8 +66,7 @@ def write_tiles(
         "total_bytes": sum(tile_bytes.values()),
     }
     (output_path / "metadata.json").write_text(
-        json.dumps(metadata, indent=indent, sort_keys=True)
-        + ("\n" if indent is not None else ""),
+        json.dumps(metadata, indent=indent, sort_keys=True) + "\n",
         encoding="utf-8",
     )
     return metadata

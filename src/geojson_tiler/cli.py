@@ -111,7 +111,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--indent",
         type=_non_negative_int,
         default=2,
-        help="Indent level for generated JSON files. Use 0 for compact but multiline output.",
+        help="Indent level for generated JSON files. Use 0 for no indentation (one key per line). "
+        "Every file ends with a newline.",
     )
     parser.add_argument(
         "--warn-tile-bytes",

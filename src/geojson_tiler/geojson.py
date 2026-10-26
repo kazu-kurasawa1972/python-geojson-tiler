@@ -114,7 +114,11 @@ def validate_geometry(geometry: Any) -> None:
 
 
 def iter_geometry_positions(geometry: Any | None) -> Iterator[Position]:
-    """Yield lon/lat positions from a supported geometry object."""
+    """Yield lon/lat positions from a supported geometry object.
+
+    Empty coordinate arrays (for example a Point with ``[]``) yield nothing, so the
+    geometry is treated like ``null``. RFC 7946 section 3.1 allows this on purpose.
+    """
     if geometry is None:
         return
 

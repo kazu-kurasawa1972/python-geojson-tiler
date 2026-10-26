@@ -90,7 +90,7 @@ Your files will then be available at paths like:
 ## Command-line usage
 
 ```bash
-geojson-tiler INPUT OUTPUT [--min-zoom MIN] [--max-zoom MAX] [--max-tiles N] [--keep-properties NAMES | --drop-properties NAMES] [--indent N] [--warn-tile-bytes N] [--overwrite] [--quiet]
+geojson-tiler INPUT OUTPUT [--min-zoom MIN] [--max-zoom MAX] [--max-tiles N] [--keep-properties NAMES | --drop-properties NAMES] [--clip] [--indent N] [--warn-tile-bytes N] [--overwrite] [--quiet]
 ```
 
 ### Arguments
@@ -102,6 +102,7 @@ geojson-tiler INPUT OUTPUT [--min-zoom MIN] [--max-zoom MAX] [--max-tiles N] [--
 - `--max-tiles`: stop with an error if more than this many tiles would be created, default `100000`
 - `--keep-properties`: comma-separated property names to keep; all others are removed (cannot be combined with `--drop-properties`)
 - `--drop-properties`: comma-separated property names to remove; all others are kept
+- `--clip`: cut each feature at the tile edges so a tile only holds the part inside it (default: off, features are written whole); see [Clipping features to tiles](#clipping-features-to-tiles)
 - `--indent`: JSON indentation level for generated files (`0` or greater), default `2`
 - `--warn-tile-bytes`: print a warning for each written tile larger than this many bytes, default `500000`
 - `--overwrite`: allow writing into a non-empty output directory
@@ -235,6 +236,42 @@ Without a filter, `props-tiles/0/0/0.geojson` contains all three properties. Wit
 - Geometry, `id` and other feature members are never changed.
 
 In Python: `tile_geojson(data, keep_properties=["name", "pop"])` or `drop_properties=["secret"]`.
+
+## Clipping features to tiles
+
+By default every tile gets the whole feature. With `--clip`, each feature is cut to the tile's longitude/latitude bounds, so tiles stay small even for huge polygons and lines. The example below is a big triangle that touches four tiles at zoom 2:
+
+```bash
+cat > triangle.geojson <<'EOF'
+{"type": "Feature", "properties": {"name": "triangle"}, "geometry": {"type": "Polygon", "coordinates": [[[-80, -60], [80, 60], [-80, 60], [-80, -60]]]}}
+EOF
+geojson-tiler triangle.geojson plain-tiles --max-zoom 2
+geojson-tiler triangle.geojson clipped-tiles --max-zoom 2 --clip
+cat plain-tiles/1/0/0.geojson
+cat clipped-tiles/1/0/0.geojson
+```
+
+The first command writes 9 tile files, and the whole triangle (`[[-80, -60], [80, 60], [-80, 60], [-80, -60]]`) appears in each of them. The second writes 7 tile files: the lower-right part of the triangle's bounding box is empty, so those tiles are not written at all. In `clipped-tiles/1/0/0.geojson` the polygon is only the part inside that tile:
+
+```json
+"coordinates": [[[-80.0, 0.0], [0.0, 0.0], [0.0, 60.0], [-80, 60], [-80.0, 0.0]]]
+```
+
+How clipping works:
+- Lines are cut at the tile edge. A line that leaves and comes back becomes a `MultiLineString`.
+- Polygon rings are cut and kept closed. Holes that disappear are dropped, and a polygon whose outer ring disappears is dropped.
+- A point goes into exactly one tile (the same tile it would get without `--clip`), even when it sits on a tile edge.
+- `Multi*` geometries keep their type and list only the parts that are left, even if that is one part. A `GeometryCollection` keeps only the members that are left.
+- Properties, `id` and other feature members are copied unchanged, so `--keep-properties` and `--drop-properties` work as usual. A third coordinate (altitude) is kept; new points on a tile edge get an interpolated altitude.
+- A feature with nothing left in a tile is not written to that tile, and a tile with no features is not written at all. `metadata.json` counts only the tiles that were written. `--max-tiles` still counts the tiles each feature's bounding box touches, before clipping.
+
+Limitations:
+- Cutting is done in plain longitude/latitude degrees with straight lines between positions (the GeoJSON rule), not in Web Mercator.
+- Features that cross the antimeridian (see above) are not clipped; they are written whole, as without `--clip`.
+- There is no buffer: geometry stops exactly at the tile edge, and a line lying exactly on an edge can appear in both neighbouring tiles. Renderers may show hairline seams between clipped polygons.
+- Clipping is slower than whole-feature tiling, and concave polygons can get thin zero-width bridges along a tile edge.
+
+In Python: `tile_geojson(data, max_zoom=2, clip=True)`.
 
 ## Python API
 

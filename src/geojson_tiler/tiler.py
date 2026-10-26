@@ -4,8 +4,9 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Iterable
 
+from .clip import clip_geometry
 from .filters import filter_feature
-from .geojson import feature_bounds, normalize_geojson
+from .geojson import crosses_antimeridian, feature_bounds, normalize_geojson
 from .xyz import TileAddress, count_tiles_for_bounds, tiles_for_bounds, validate_zoom
 
 
@@ -41,11 +42,15 @@ def tile_geojson(
     max_tiles: int = DEFAULT_MAX_TILES,
     keep_properties: Iterable[str] | None = None,
     drop_properties: Iterable[str] | None = None,
+    clip: bool = False,
 ) -> TileBuildResult:
     """Split a GeoJSON object into tile-sized FeatureCollections.
 
     Raises TileLimitError as soon as more than ``max_tiles`` tiles would be needed.
     ``keep_properties`` / ``drop_properties`` (not both) filter feature properties.
+    With ``clip=True`` each feature's geometry is cut to the tile bounds and tiles left with no
+    features are not created; ``max_tiles`` still counts candidate tiles before clipping.
+    Features that cross the antimeridian are never clipped.
     """
     validate_zoom_range(min_zoom, max_zoom)
     if isinstance(max_tiles, bool) or not isinstance(max_tiles, int) or max_tiles < 1:
@@ -63,6 +68,8 @@ def tile_geojson(
         bounds = feature_bounds(feature)
         if bounds is None:
             continue
+        # Antimeridian features are kept whole: lon/lat clipping would cut them wrongly.
+        clipping = clip and not crosses_antimeridian(feature["geometry"])
         if filtering:
             feature = filter_feature(feature, keep=keep_properties, drop=drop_properties)
 
@@ -71,7 +78,9 @@ def tile_geojson(
             if count_tiles_for_bounds(bounds, zoom) > max_tiles:
                 raise _too_many_tiles(max_tiles)
             for tile in tiles_for_bounds(bounds, zoom):
-                buckets[tile].append(feature)
+                piece = _clip_feature(feature, tile) if clipping else feature
+                if piece is not None:
+                    buckets[tile].append(piece)
             if len(buckets) > max_tiles:
                 raise _too_many_tiles(max_tiles)
 
@@ -85,6 +94,15 @@ def tile_geojson(
         tile_count=len(tile_documents),
     )
 
+
+def _clip_feature(feature: dict[str, Any], tile: TileAddress) -> dict[str, Any] | None:
+    """Return a copy of ``feature`` clipped to ``tile``, or None if nothing is left."""
+    clipped = clip_geometry(feature["geometry"], tile)
+    if clipped is None:
+        return None
+    result = dict(feature)
+    result["geometry"] = clipped
+    return result
 
 
 def _too_many_tiles(max_tiles: int) -> TileLimitError:
